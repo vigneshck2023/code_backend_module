@@ -3,33 +3,29 @@ const express = require("express");
 const cors = require("cors");
 const serverless = require("serverless-http");
 
-const app = express();
-
 const { initializeDatabase } = require("../db/db.connect");
 const Book = require("../models/book.models");
+
+const app = express();
 
 app.use(express.json());
 app.use(cors({ origin: "*", credentials: true, optionsSuccessStatus: 200 }));
 
-initializeDatabase();
-
-// ---------------- CREATE BOOK ----------------
-async function createBook(newBook) {
+// Middleware to ensure DB is connected before handling the request
+app.use(async (req, res, next) => {
     try {
-        const book = new Book(newBook);
-        return await book.save();
+        await initializeDatabase();
+        next();
     } catch (error) {
-        throw error;
+        res.status(500).json({ error: "Database connection failed", details: error.message });
     }
-}
-
-app.get("/", (req, res) => {
-    res.send("Hello from Express Server");
 });
 
+// ---------------- CREATE BOOK ----------------
 app.post("/books", async (req, res) => {
     try {
-        const savedBook = await createBook(req.body);
+        const book = new Book(req.body);
+        const savedBook = await book.save();
         res.status(201).json({ message: "Book added successfully", book: savedBook });
     } catch (error) {
         res.status(500).json({ message: "Error adding book", error: error.message });
@@ -54,11 +50,7 @@ app.get("/booksData", async (req, res) => {
 app.get("/books/title/:bookTitle", async (req, res) => {
     try {
         const books = await Book.find({ title: req.params.bookTitle });
-        if (books.length) {
-            res.json(books);
-        } else {
-            res.status(404).json({ error: "No books found" });
-        }
+        books.length ? res.json(books) : res.status(404).json({ error: "No books found" });
     } catch (error) {
         res.status(500).json({ error: "Failed to fetch books." });
     }
@@ -68,11 +60,7 @@ app.get("/books/title/:bookTitle", async (req, res) => {
 app.get("/books/genre/:bookGenre", async (req, res) => {
     try {
         const books = await Book.find({ genre: req.params.bookGenre });
-        if (books.length) {
-            res.json(books);
-        } else {
-            res.status(404).json({ error: "No books found" });
-        }
+        books.length ? res.json(books) : res.status(404).json({ error: "No books found" });
     } catch (error) {
         res.status(500).json({ error: "Failed to fetch books." });
     }
@@ -82,11 +70,7 @@ app.get("/books/genre/:bookGenre", async (req, res) => {
 app.get("/books/year/:bookYear", async (req, res) => {
     try {
         const books = await Book.find({ publishedYear: req.params.bookYear });
-        if (books.length) {
-            res.json(books);
-        } else {
-            res.status(404).json({ error: "No books found" });
-        }
+        books.length ? res.json(books) : res.status(404).json({ error: "No books found" });
     } catch (error) {
         res.status(500).json({ error: "Failed to fetch books." });
     }
@@ -95,12 +79,13 @@ app.get("/books/year/:bookYear", async (req, res) => {
 // ---------------- UPDATE BY ID ----------------
 app.put("/books/id/:bookId", async (req, res) => {
     try {
-        const updatedBook = await Book.findByIdAndUpdate(req.params.bookId, req.body, { new: true, runValidators: true });
-        if (updatedBook) {
-            res.status(200).json({ message: "Book updated successfully", book: updatedBook });
-        } else {
-            res.status(404).json({ error: "Book not found" });
-        }
+        const updatedBook = await Book.findByIdAndUpdate(req.params.bookId, req.body, {
+            new: true,
+            runValidators: true
+        });
+        updatedBook
+            ? res.status(200).json({ message: "Book updated successfully", book: updatedBook })
+            : res.status(404).json({ error: "Book not found" });
     } catch (error) {
         res.status(500).json({ error: "Failed to update book." });
     }
@@ -109,12 +94,14 @@ app.put("/books/id/:bookId", async (req, res) => {
 // ---------------- UPDATE BY TITLE ----------------
 app.post("/books/title/:bookTitle", async (req, res) => {
     try {
-        const updatedBook = await Book.findOneAndUpdate({ title: req.params.bookTitle }, req.body, { new: true, runValidators: true });
-        if (updatedBook) {
-            res.status(200).json({ message: "Book updated successfully", book: updatedBook });
-        } else {
-            res.status(404).json({ error: "Book does not exist" });
-        }
+        const updatedBook = await Book.findOneAndUpdate(
+            { title: req.params.bookTitle },
+            req.body,
+            { new: true, runValidators: true }
+        );
+        updatedBook
+            ? res.status(200).json({ message: "Book updated successfully", book: updatedBook })
+            : res.status(404).json({ error: "Book does not exist" });
     } catch (error) {
         res.status(500).json({ error: "Failed to update book" });
     }
@@ -124,15 +111,16 @@ app.post("/books/title/:bookTitle", async (req, res) => {
 app.delete("/books/:bookId", async (req, res) => {
     try {
         const deletedBook = await Book.findByIdAndDelete(req.params.bookId);
-        if (deletedBook) {
-            res.status(200).json({ message: "Book deleted successfully", book: deletedBook });
-        } else {
-            res.status(404).json({ error: "Book not found" });
-        }
+        deletedBook
+            ? res.status(200).json({ message: "Book deleted successfully", book: deletedBook })
+            : res.status(404).json({ error: "Book not found" });
     } catch (error) {
         res.status(500).json({ error: "Failed to delete book." });
     }
 });
 
-// Export handler for Vercel
+app.get("/", (req, res) => {
+    res.send("Hello from Express Server");
+});
+
 module.exports = serverless(app);
