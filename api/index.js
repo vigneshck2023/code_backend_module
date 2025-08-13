@@ -1,9 +1,13 @@
 require("dotenv").config({ path: require("path").resolve(__dirname, "../.env") });
 const express = require("express");
+const cors = require("cors");
+const serverless = require("serverless-http");
+
 const app = express();
 
 const { initializeDatabase } = require("../db/db.connect");
 const Book = require("../models/book.models");
+
 app.use(express.json());
 app.use(cors({ origin: "*", credentials: true, optionsSuccessStatus: 200 }));
 
@@ -13,8 +17,7 @@ initializeDatabase();
 async function createBook(newBook) {
     try {
         const book = new Book(newBook);
-        const savedBook = await book.save();
-        return savedBook;
+        return await book.save();
     } catch (error) {
         throw error;
     }
@@ -34,18 +37,10 @@ app.post("/books", async (req, res) => {
 });
 
 // ---------------- READ ALL BOOKS ----------------
-async function readAllBooks() {
-    try {
-        return await Book.find();
-    } catch (error) {
-        throw error;
-    }
-}
-
 app.get("/booksData", async (req, res) => {
     try {
-        const allBooks = await readAllBooks();
-        if (allBooks.length !== 0) {
+        const allBooks = await Book.find();
+        if (allBooks.length) {
             res.json(allBooks);
         } else {
             res.status(404).json({ error: "No books found" });
@@ -56,18 +51,10 @@ app.get("/booksData", async (req, res) => {
 });
 
 // ---------------- READ BY TITLE ----------------
-async function readBooksByTitle(bookTitle) {
-    try {
-        return await Book.find({ title: bookTitle });
-    } catch (error) {
-        throw error;
-    }
-}
-
 app.get("/books/title/:bookTitle", async (req, res) => {
     try {
-        const books = await readBooksByTitle(req.params.bookTitle);
-        if (books.length !== 0) {
+        const books = await Book.find({ title: req.params.bookTitle });
+        if (books.length) {
             res.json(books);
         } else {
             res.status(404).json({ error: "No books found" });
@@ -78,19 +65,11 @@ app.get("/books/title/:bookTitle", async (req, res) => {
 });
 
 // ---------------- READ BY GENRE ----------------
-async function readBooksByGenre(bookGenre) {
-    try {
-        return await Book.find({ genre: bookGenre });
-    } catch (error) {
-        throw error;
-    }
-}
-
 app.get("/books/genre/:bookGenre", async (req, res) => {
     try {
-        const genre = await readBooksByGenre(req.params.bookGenre);
-        if (genre.length !== 0) {
-            res.json(genre);
+        const books = await Book.find({ genre: req.params.bookGenre });
+        if (books.length) {
+            res.json(books);
         } else {
             res.status(404).json({ error: "No books found" });
         }
@@ -100,19 +79,11 @@ app.get("/books/genre/:bookGenre", async (req, res) => {
 });
 
 // ---------------- READ BY YEAR ----------------
-async function readBooksByReleaseYear(bookYear) {
-    try {
-        return await Book.find({ publishedYear: bookYear });
-    } catch (error) {
-        throw error;
-    }
-}
-
 app.get("/books/year/:bookYear", async (req, res) => {
     try {
-        const year = await readBooksByReleaseYear(req.params.bookYear);
-        if (year.length !== 0) {
-            res.json(year);
+        const books = await Book.find({ publishedYear: req.params.bookYear });
+        if (books.length) {
+            res.json(books);
         } else {
             res.status(404).json({ error: "No books found" });
         }
@@ -121,18 +92,10 @@ app.get("/books/year/:bookYear", async (req, res) => {
     }
 });
 
-// ---------------- UPDATE BOOK BY ID ----------------
-async function updateBook(bookId, dataToUpdate) {
-    try {
-        return await Book.findByIdAndUpdate(bookId, dataToUpdate, { new: true, runValidators: true });
-    } catch (error) {
-        throw error;
-    }
-}
-
+// ---------------- UPDATE BY ID ----------------
 app.put("/books/id/:bookId", async (req, res) => {
     try {
-        const updatedBook = await updateBook(req.params.bookId, req.body);
+        const updatedBook = await Book.findByIdAndUpdate(req.params.bookId, req.body, { new: true, runValidators: true });
         if (updatedBook) {
             res.status(200).json({ message: "Book updated successfully", book: updatedBook });
         } else {
@@ -143,22 +106,10 @@ app.put("/books/id/:bookId", async (req, res) => {
     }
 });
 
-// ---------------- UPDATE BOOK BY TITLE ----------------
-async function updateOne(bookTitle, dataToUpdate) {
-    try {
-        return await Book.findOneAndUpdate(
-            { title: bookTitle },
-            dataToUpdate,
-            { new: true, runValidators: true }
-        );
-    } catch (error) {
-        throw error;
-    }
-}
-
+// ---------------- UPDATE BY TITLE ----------------
 app.post("/books/title/:bookTitle", async (req, res) => {
     try {
-        const updatedBook = await updateOne(req.params.bookTitle, req.body);
+        const updatedBook = await Book.findOneAndUpdate({ title: req.params.bookTitle }, req.body, { new: true, runValidators: true });
         if (updatedBook) {
             res.status(200).json({ message: "Book updated successfully", book: updatedBook });
         } else {
@@ -170,17 +121,9 @@ app.post("/books/title/:bookTitle", async (req, res) => {
 });
 
 // ---------------- DELETE BOOK ----------------
-async function deleteBook(bookId) {
-    try {
-        return await Book.findByIdAndDelete(bookId);
-    } catch (error) {
-        throw error;
-    }
-}
-
 app.delete("/books/:bookId", async (req, res) => {
     try {
-        const deletedBook = await deleteBook(req.params.bookId);
+        const deletedBook = await Book.findByIdAndDelete(req.params.bookId);
         if (deletedBook) {
             res.status(200).json({ message: "Book deleted successfully", book: deletedBook });
         } else {
@@ -191,6 +134,5 @@ app.delete("/books/:bookId", async (req, res) => {
     }
 });
 
-// ---------------- START SERVER ----------------
-module.exports = app;
-module.exports.handler = serverless(app);
+// Export handler for Vercel
+module.exports = serverless(app);
